@@ -96,10 +96,10 @@ ema1_period = ta.ema(ma_src, ema1_length)
 ema2_period = ta.ema(ma_src, ema2_length)
 ema3_period = ta.ema(ma_src, ema3_length)
 
-plot(sma1_period, title = "SMA", color = color.new(#9f29ff, 70), style = plot.style_circles, display = sma1_show ? display.all : display.none)
-plot(ema1_period, title = "EMA1", color = color.new(#9f29ff, 70), display = ema1_show ? display.all : display.none)
-plot(ema2_period, title = "EMA2", color = color.new(#FF6D00, 70), display = ema2_show ? display.all : display.none)
-plot(ema3_period, title = "EMA3", color = color.new(#2962FF, 70), display = ema3_show ? display.all : display.none)
+plot(sma1_period, title = "SMA", color = color.new(#9f29ff, 35), style = plot.style_circles, display = sma1_show ? display.all : display.none)
+plot(ema1_period, title = "EMA1", color = color.new(#9f29ff, 35), display = ema1_show ? display.all : display.none)
+plot(ema2_period, title = "EMA2", color = color.new(#FF6D00, 35), display = ema2_show ? display.all : display.none)
+plot(ema3_period, title = "EMA3", color = color.new(#2962FF, 35), display = ema3_show ? display.all : display.none)
 
 // macd (overlay scaled)
 macd_GROUP = "MACD Settings"
@@ -119,8 +119,8 @@ macd_hist = macd_val - macd_signal
 // alertcondition(macd_hist[1] >= 0 and macd_hist < 0, title = 'Rising to falling', message = 'The MACD histogram switched from a rising to falling state')
 // alertcondition(macd_hist[1] <= 0 and macd_hist > 0, title = 'Falling to rising', message = 'The MACD histogram switched from a falling to rising state')
 
-macd_price_offset = ta.lowest(close, 50) * 0.98
-macd_scaling_factor = ta.highest(close, 50) * 0.02
+macd_price_offset = ta.lowest(close, 50) * 0.97
+macd_scaling_factor = ta.highest(close, 50)
 macd_normalized_macd = macd_val * macd_scaling_factor
 macd_normalized_signal = macd_signal * macd_scaling_factor
 macd_normalized_hist = macd_hist * macd_scaling_factor
