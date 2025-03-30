@@ -1,0 +1,131 @@
+// This Pine Script™ code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © xsheng120
+
+//@version=6
+indicator(title="Xtrat", shorttitle="Xtrat", overlay=true, timeframe="", timeframe_gaps=true)
+
+// vwap
+vwap_hideonDWM = input(false, title="Hide VWAP on 1D or Above", group="VWAP Settings", display = display.data_window)
+var vwap_anchor = input.string(defval = "Session", title="Anchor Period", options=["Session", "Week", "Month", "Quarter", "Year", "Decade", "Century", "Earnings", "Dividends", "Splits"], group="VWAP Settings")
+vwap_src = input(title = "Source", defval = hlc3, group="VWAP Settings", display = display.data_window)
+vwap_offset = input.int(0, title="Offset", group="VWAP Settings", minval=0, display = display.data_window)
+
+vwap_BANDS_GROUP = "Bands Settings"
+vwap_CALC_MODE_TOOLTIP = "Determines the units used to calculate the distance of the bands. When 'Percentage' is selected, a multiplier of 1 means 1%."
+vwap_calcModeInput = input.string("Standard Deviation", "Bands Calculation Mode", options = ["Standard Deviation", "Percentage"], group = vwap_BANDS_GROUP, tooltip = vwap_CALC_MODE_TOOLTIP, display = display.data_window)
+vwap_showBand_1 = input(true, title = "", group = vwap_BANDS_GROUP, inline = "band_1", display = display.data_window)
+vwap_bandMult_1 = input.float(1.0, title = "Bands Multiplier #1", group = vwap_BANDS_GROUP, inline = "band_1", step = 0.5, minval=0, display = display.data_window)
+vwap_showBand_2 = input(false, title = "", group = vwap_BANDS_GROUP, inline = "band_2", display = display.data_window)
+vwap_bandMult_2 = input.float(2.0, title = "Bands Multiplier #2", group = vwap_BANDS_GROUP, inline = "band_2", step = 0.5, minval=0, display = display.data_window)
+vwap_showBand_3 = input(false, title = "", group = vwap_BANDS_GROUP, inline = "band_3", display = display.data_window)
+vwap_bandMult_3 = input.float(3.0, title = "Bands Multiplier #3", group = vwap_BANDS_GROUP, inline = "band_3", step = 0.5, minval=0, display = display.data_window)
+
+vwap_cumVolume = ta.cum(volume)
+if barstate.islast and vwap_cumVolume == 0
+    runtime.error("No volume is provided by the data vendor.")
+
+vwap_new_earnings = request.earnings(syminfo.tickerid, earnings.actual, barmerge.gaps_on, barmerge.lookahead_on, ignore_invalid_symbol=true)
+vwap_new_dividends = request.dividends(syminfo.tickerid, dividends.gross, barmerge.gaps_on, barmerge.lookahead_on, ignore_invalid_symbol=true)
+vwap_new_split = request.splits(syminfo.tickerid, splits.denominator, barmerge.gaps_on, barmerge.lookahead_on, ignore_invalid_symbol=true)
+
+vwap_isNewPeriod = switch vwap_anchor
+	"Earnings"  => not na(vwap_new_earnings)
+	"Dividends" => not na(vwap_new_dividends)
+	"Splits"    => not na(vwap_new_split)
+	"Session"   => timeframe.change("D")
+	"Week"      => timeframe.change("W")
+	"Month"     => timeframe.change("M")
+	"Quarter"   => timeframe.change("3M")
+	"Year"      => timeframe.change("12M")
+	"Decade"    => timeframe.change("12M") and year % 10 == 0
+	"Century"   => timeframe.change("12M") and year % 100 == 0
+	=> false
+
+vwap_isEsdAnchor = vwap_anchor == "Earnings" or vwap_anchor == "Dividends" or vwap_anchor == "Splits"
+if na(vwap_src[1]) and not vwap_isEsdAnchor
+	vwap_isNewPeriod := true
+
+float vwap_vwapValue = na
+float vwap_upperBandValue1 = na
+float vwap_lowerBandValue1 = na
+float vwap_upperBandValue2 = na
+float vwap_lowerBandValue2 = na
+float vwap_upperBandValue3 = na
+float vwap_lowerBandValue3 = na
+
+if not (vwap_hideonDWM and timeframe.isdwm)
+    [_vwap, _stdevUpper, _] = ta.vwap(vwap_src, vwap_isNewPeriod, 1)
+	vwap_vwapValue := _vwap
+    vwap_stdevAbs = _stdevUpper - _vwap
+	vwap_bandBasis = vwap_calcModeInput == "Standard Deviation" ? vwap_stdevAbs : _vwap * 0.01
+	vwap_upperBandValue1 := _vwap + vwap_bandBasis * vwap_bandMult_1
+	vwap_lowerBandValue1 := _vwap - vwap_bandBasis * vwap_bandMult_1
+	vwap_upperBandValue2 := _vwap + vwap_bandBasis * vwap_bandMult_2
+	vwap_lowerBandValue2 := _vwap - vwap_bandBasis * vwap_bandMult_2
+	vwap_upperBandValue3 := _vwap + vwap_bandBasis * vwap_bandMult_3
+	vwap_lowerBandValue3 := _vwap - vwap_bandBasis * vwap_bandMult_3
+
+plot(vwap_vwapValue, title = "VWAP", color = color.white, offset = vwap_offset)
+
+vwap_upperBand_1 = plot(vwap_upperBandValue1, title="Upper Band #1", color = color.green, offset = vwap_offset, display = vwap_showBand_1 ? display.all : display.none, editable = vwap_showBand_1)
+vwap_lowerBand_1 = plot(vwap_lowerBandValue1, title="Lower Band #1", color = color.green, offset = vwap_offset, display = vwap_showBand_1 ? display.all : display.none, editable = vwap_showBand_1)
+fill(vwap_upperBand_1, vwap_lowerBand_1,      title="Bands Fill #1", color = color.new(color.green, 95),   display = vwap_showBand_1 ? display.all : display.none, editable = vwap_showBand_1)
+
+vwap_upperBand_2 = plot(vwap_upperBandValue2, title="Upper Band #2", color = color.olive, offset = vwap_offset, display = vwap_showBand_2 ? display.all : display.none, editable = vwap_showBand_2)
+vwap_lowerBand_2 = plot(vwap_lowerBandValue2, title="Lower Band #2", color = color.olive, offset = vwap_offset, display = vwap_showBand_2 ? display.all : display.none, editable = vwap_showBand_2)
+fill(vwap_upperBand_2, vwap_lowerBand_2,      title="Bands Fill #2", color = color.new(color.olive, 95),   display = vwap_showBand_2 ? display.all : display.none, editable = vwap_showBand_2)
+
+vwap_upperBand_3 = plot(vwap_upperBandValue3, title="Upper Band #3", color = color.teal, offset = vwap_offset, display = vwap_showBand_3 ? display.all : display.none, editable = vwap_showBand_3)
+vwap_lowerBand_3 = plot(vwap_lowerBandValue3, title="Lower Band #3", color = color.teal, offset = vwap_offset, display = vwap_showBand_3 ? display.all : display.none, editable = vwap_showBand_3)
+fill(vwap_upperBand_3, vwap_lowerBand_3,      title="Bands Fill #3", color = color.new(color.teal, 95),   display = vwap_showBand_3 ? display.all : display.none, editable = vwap_showBand_3)
+
+// mas
+ma_GROUP = "Moving Averages Settings"
+ma_src = input(title = "Source", defval = close, group = ma_GROUP)
+sma1_show = input(true, title = "", inline = "sma1", group = ma_GROUP)
+sma1_length = input.int(defval = 200, title = "SMA Length", inline = "sma1", group = ma_GROUP)
+ema1_show = input(true, title = "", inline = "ema1", group = ma_GROUP)
+ema1_length = input.int(defval = 200, title = "EMA1 Length", inline = "ema1", group = ma_GROUP)
+ema2_show = input(true, title = "", inline = "ema2", group = ma_GROUP)
+ema2_length = input.int(defval = 20, title = "EMA2 Length", inline = "ema2", group = ma_GROUP)
+ema3_show = input(true, title = "", inline = "ema3", group = ma_GROUP)
+ema3_length = input.int(defval = 9, title = "EMA3 Length", inline = "ema3", group = ma_GROUP)
+
+sma1_period = ta.sma(ma_src, sma1_length)
+ema1_period = ta.ema(ma_src, ema1_length)
+ema2_period = ta.ema(ma_src, ema2_length)
+ema3_period = ta.ema(ma_src, ema3_length)
+
+plot(sma1_period, title = "SMA", color = color.new(#9f29ff, 70), style = plot.style_circles, display = sma1_show ? display.all : display.none)
+plot(ema1_period, title = "EMA1", color = color.new(#9f29ff, 70), display = ema1_show ? display.all : display.none)
+plot(ema2_period, title = "EMA2", color = color.new(#FF6D00, 70), display = ema2_show ? display.all : display.none)
+plot(ema3_period, title = "EMA3", color = color.new(#2962FF, 70), display = ema3_show ? display.all : display.none)
+
+// macd (overlay scaled)
+macd_GROUP = "MACD Settings"
+macd_fast_length = input(title = "Fast Length", defval = 12, group = macd_GROUP)
+macd_slow_length = input(title = "Slow Length", defval = 26, group = macd_GROUP)
+macd_src = input(title = "Source", defval = close, group = macd_GROUP)
+macd_signal_length = input.int(title = "Signal Smoothing",  minval = 1, maxval = 50, defval = 9, group = macd_GROUP, display = display.data_window)
+macd_source_type = input.string(title = "Oscillator MA Type",  defval = "EMA", options = ["SMA", "EMA"], group = macd_GROUP, display = display.data_window)
+macd_signal_type = input.string(title = "Signal Line MA Type", defval = "EMA", options = ["SMA", "EMA"], group = macd_GROUP, display = display.data_window)
+
+macd_fast_ma = macd_source_type == "SMA" ? ta.sma(macd_src, macd_fast_length) : ta.ema(macd_src, macd_fast_length)
+macd_slow_ma = macd_source_type == "SMA" ? ta.sma(macd_src, macd_slow_length) : ta.ema(macd_src, macd_slow_length)
+macd_val = macd_fast_ma - macd_slow_ma
+macd_signal = macd_signal_type == "SMA" ? ta.sma(macd_val, macd_signal_length) : ta.ema(macd_val, macd_signal_length)
+macd_hist = macd_val - macd_signal
+
+// alertcondition(macd_hist[1] >= 0 and macd_hist < 0, title = 'Rising to falling', message = 'The MACD histogram switched from a rising to falling state')
+// alertcondition(macd_hist[1] <= 0 and macd_hist > 0, title = 'Falling to rising', message = 'The MACD histogram switched from a falling to rising state')
+
+macd_price_offset = ta.lowest(close, 50) * 0.98
+macd_scaling_factor = ta.highest(close, 50) * 0.02
+macd_normalized_macd = macd_val * macd_scaling_factor
+macd_normalized_signal = macd_signal * macd_scaling_factor
+macd_normalized_hist = macd_hist * macd_scaling_factor
+
+plot(macd_price_offset, title = "Zero Line", color = color.new(color.gray, 65))
+// plot(macd_normalized_hist + macd_price_offset, title = "Histogram", style = plot.style_columns, color = (macd_hist >= 0 ? (macd_hist[1] < macd_hist ? #26A69A : #B2DFDB) : (macd_hist[1] < macd_hist ? #FFCDD2 : #FF5252)))
+plot(macd_normalized_macd + macd_price_offset,   title = "MACD",   color = color.new(#2962FF, 65))
+plot(macd_normalized_signal + macd_price_offset, title = "Signal", color = color.new(#FF6D00, 65))
