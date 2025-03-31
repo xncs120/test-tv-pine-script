@@ -96,36 +96,30 @@ ema1_period = ta.ema(ma_src, ema1_length)
 ema2_period = ta.ema(ma_src, ema2_length)
 ema3_period = ta.ema(ma_src, ema3_length)
 
-plot(sma1_period, title = "SMA", color = color.new(#9f29ff, 35), style = plot.style_circles, display = sma1_show ? display.all : display.none)
-plot(ema1_period, title = "EMA1", color = color.new(#9f29ff, 35), display = ema1_show ? display.all : display.none)
-plot(ema2_period, title = "EMA2", color = color.new(#FF6D00, 35), display = ema2_show ? display.all : display.none)
-plot(ema3_period, title = "EMA3", color = color.new(#2962FF, 35), display = ema3_show ? display.all : display.none)
+plot(sma1_period, title = "SMA", color = color.new(#9F29FF, 35), style = plot.style_circles, display = sma1_show ? display.all : display.none)
+plot(ema1_period, title = "EMA1", color = color.new(#9F29FF, 35), display = ema1_show ? display.all : display.none)
+plot(ema2_period, title = "EMA2", color = color.new(#2962FF, 35), display = ema2_show ? display.all : display.none)
+plot(ema3_period, title = "EMA3", color = color.new(#E5FF00, 35), display = ema3_show ? display.all : display.none)
 
-// macd (overlay scaled)
-macd_GROUP = "MACD Settings"
-macd_fast_length = input(title = "Fast Length", defval = 12, group = macd_GROUP)
-macd_slow_length = input(title = "Slow Length", defval = 26, group = macd_GROUP)
+// macd momentum
+macd_GROUP = "MACD momentum Settings"
 macd_src = input(title = "Source", defval = close, group = macd_GROUP)
-macd_signal_length = input.int(title = "Signal Smoothing",  minval = 1, maxval = 50, defval = 9, group = macd_GROUP, display = display.data_window)
-macd_source_type = input.string(title = "Oscillator MA Type",  defval = "EMA", options = ["SMA", "EMA"], group = macd_GROUP, display = display.data_window)
-macd_signal_type = input.string(title = "Signal Line MA Type", defval = "EMA", options = ["SMA", "EMA"], group = macd_GROUP, display = display.data_window)
+macd_ma_source = input.string(title = "Oscillator MA Type",  defval = "EMA", options = ["SMA", "EMA"], group = macd_GROUP)
+macd_ma_signal = input.string(title = "Signal Line MA Type", defval = "EMA", options = ["SMA", "EMA"], group = macd_GROUP)
+macd_signal_length = input.int(title = "Signal Smoothing",  minval = 1, maxval = 50, defval = 9, group = macd_GROUP)
+macd_fast_length = input.int(defval = 12, title = "Fast Length", group = macd_GROUP)
+macd_slow_length = input.int(defval = 26, title = "Slow Length", group = macd_GROUP)
 
-macd_fast_ma = macd_source_type == "SMA" ? ta.sma(macd_src, macd_fast_length) : ta.ema(macd_src, macd_fast_length)
-macd_slow_ma = macd_source_type == "SMA" ? ta.sma(macd_src, macd_slow_length) : ta.ema(macd_src, macd_slow_length)
+macd_fast_ma = macd_ma_source == "SMA" ? ta.sma(macd_src, macd_fast_length) : ta.ema(macd_src, macd_fast_length)
+macd_slow_ma = macd_ma_source == "SMA" ? ta.sma(macd_src, macd_slow_length) : ta.ema(macd_src, macd_slow_length)
 macd_val = macd_fast_ma - macd_slow_ma
-macd_signal = macd_signal_type == "SMA" ? ta.sma(macd_val, macd_signal_length) : ta.ema(macd_val, macd_signal_length)
+macd_signal = macd_ma_signal == "SMA" ? ta.sma(macd_val, macd_signal_length) : ta.ema(macd_val, macd_signal_length)
 macd_hist = macd_val - macd_signal
 
-// alertcondition(macd_hist[1] >= 0 and macd_hist < 0, title = 'Rising to falling', message = 'The MACD histogram switched from a rising to falling state')
-// alertcondition(macd_hist[1] <= 0 and macd_hist > 0, title = 'Falling to rising', message = 'The MACD histogram switched from a falling to rising state')
+macd_plotFast = plot(macd_fast_ma, title = "Fast MA", color = na, display = display.none)
+macd_plotSlow = plot(macd_slow_ma, title = "Slow MA", color = na, display = display.none)
+macd_fillColor = macd_hist > 0 ? color.new(color.green, 85) : macd_hist < 0 ? color.new(color.red, 85) : na
+fill(macd_plotFast, macd_plotSlow, color = macd_fillColor, title = "MACD Hist Cloud")
 
-macd_price_offset = ta.lowest(close, 50) * 0.97
-macd_scaling_factor = ta.highest(close, 50)
-macd_normalized_macd = macd_val * macd_scaling_factor
-macd_normalized_signal = macd_signal * macd_scaling_factor
-macd_normalized_hist = macd_hist * macd_scaling_factor
-
-plot(macd_price_offset, title = "Zero Line", color = color.new(color.gray, 65))
-// plot(macd_normalized_hist + macd_price_offset, title = "Histogram", style = plot.style_columns, color = (macd_hist >= 0 ? (macd_hist[1] < macd_hist ? #26A69A : #B2DFDB) : (macd_hist[1] < macd_hist ? #FFCDD2 : #FF5252)))
-plot(macd_normalized_macd + macd_price_offset,   title = "MACD",   color = color.new(#2962FF, 65))
-plot(macd_normalized_signal + macd_price_offset, title = "Signal", color = color.new(#FF6D00, 65))
+// alertcondition(ta.crossover(macd_hist, 0), title = 'MACD Hist Positive', message = '{{ticker}} ({{interval}}): MACD Histogram turned Positive (Cloud Green)')
+// alertcondition(ta.crossunder(macd_hist, 0), title = 'MACD Hist Negative', message = '{{ticker}} ({{interval}}): MACD Histogram turned Negative (Cloud Red)')
